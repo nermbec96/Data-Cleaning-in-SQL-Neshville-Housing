@@ -1,0 +1,108 @@
+--Chacking dataset 
+select *
+from dbo.NashvilleHousing
+
+--Populate Property Address Data
+select a.ParcelID, a.PropertyAddress, b.ParcelID, b.PropertyAddress, ISNULL(a.PropertyAddress,b.PropertyAddress)
+from dbo.NashvilleHousing a
+join dbo.NashvilleHousing b 
+    on a.ParcelID = b.ParcelID
+    and a.UniqueID <> b.UniqueID
+where a.PropertyAddress is null
+
+UPDATE a
+set PropertyAddress = ISNULL(a.PropertyAddress,b.PropertyAddress)
+from dbo.NashvilleHousing a
+join dbo.NashvilleHousing b 
+    on a.ParcelID = b.ParcelID
+    and a.UniqueID <> b.UniqueID
+where a.PropertyAddress is null
+
+select PropertyAddress --Chacking 
+from dbo.NashvilleHousing
+where PropertyAddress is null
+
+--Braking out Adrress into individual columns (Address, City, State)
+select 
+SUBSTRING(PropertyAddress, 1, CHARINDEX(',',PropertyAddress)-1) as Adrress
+,SUBSTRING(PropertyAddress, CHARINDEX(',',PropertyAddress)+1,LEN(PropertyAddress)) as City
+from dbo.NashvilleHousing
+
+ALTER TABLE NashvilleHousing
+add PropertySplitAdrress char(50);
+
+update NashvilleHousing 
+set PropertySplitAdrress = SUBSTRING(PropertyAddress, 1, CHARINDEX(',',PropertyAddress)-1)
+
+ALTER TABLE NashvilleHousing
+add PropertySplitCity char(50);
+
+update NashvilleHousing 
+set PropertySplitCity = SUBSTRING(PropertyAddress, CHARINDEX(',',PropertyAddress)+1,LEN(PropertyAddress))
+
+select *
+from dbo.NashvilleHousing
+
+SELECT
+PARSENAME(REPLACE(OwnerAddress,',','.'),3)
+,PARSENAME(REPLACE(OwnerAddress,',','.'),2)
+,PARSENAME(REPLACE(OwnerAddress,',','.'),1)
+from dbo.NashvilleHousing
+
+ALTER TABLE NashvilleHousing
+add OwnerSplitAdrress char(50);
+
+update NashvilleHousing 
+set OwnerSplitAdrress = PARSENAME(REPLACE(OwnerAddress,',','.'),3)
+
+ALTER TABLE NashvilleHousing
+add OwnerSplitCity char(50);
+
+update NashvilleHousing 
+set OwnerSplitCity = PARSENAME(REPLACE(OwnerAddress,',','.'),2)
+
+ALTER TABLE NashvilleHousing
+add OwnerSplitState char(10);
+
+update NashvilleHousing 
+set OwnerSplitState = PARSENAME(REPLACE(OwnerAddress,',','.'),1)
+
+select *
+from dbo.NashvilleHousing
+
+--Change Y and N to Yes and No in 'SoldasVacant' column
+SELECT SoldAsVacant
+,case when SoldAsVacant = 'Y'then 'Yes'
+      when SoldAsVacant = 'N'then 'No'
+      else SoldAsVacant
+      end
+from dbo.NashvilleHousing
+
+update NashvilleHousing
+set SoldAsVacant = case when SoldAsVacant = 'Y'then 'Yes'
+      when SoldAsVacant = 'N'then 'No'
+      else SoldAsVacant
+      end
+
+--Remove Duplicates
+with Row_NumCTE as (
+select*,
+    ROW_NUMBER() over(
+        PARTITION by ParcelID,
+                     PropertyAddress,
+                     SalePrice,
+                     SaleDate,
+                     LegalReference
+                     Order BY
+                        UniqueID
+                        ) row_num
+    
+from dbo.NashvilleHousing
+)
+delete
+from Row_NumCTE
+where row_num > 1
+
+--Delete unused columns 
+Alter table dbo.NashvilleHousing
+drop column OwnerAddress,PropertyAddress,TaxDistrict
